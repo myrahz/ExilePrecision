@@ -11,14 +11,12 @@ namespace ExilePrecision.Core.Combat.Skills
     public class SkillHandler
     {
         private readonly GameController _gameController;
-        private readonly ExilePrecisionSettings _settings;
         private readonly KeyHandler _keyHandler;
         private readonly Dictionary<string, ActiveSkill> _skills = new();
 
-        public SkillHandler(GameController gameController, ExilePrecisionSettings settings)
+        public SkillHandler(GameController gameController)
         {
             _gameController = gameController;
-            _settings = settings;
             _keyHandler = new KeyHandler();
         }
 
@@ -27,7 +25,7 @@ namespace ExilePrecision.Core.Combat.Skills
             try
             {
                 var existingSkills = new Dictionary<string, ActiveSkill>();
-                foreach (var skill in _settings.Combat.Skills.Content)
+                foreach (var skill in ExilePrecision.Instance.Settings.Combat.Skills.Content)
                 {
                     existingSkills[skill.Name] = skill;
                 }
@@ -80,10 +78,10 @@ namespace ExilePrecision.Core.Combat.Skills
                     }
                 }
 
-                _settings.Combat.Skills.Content.Clear();
+                ExilePrecision.Instance.Settings.Combat.Skills.Content.Clear();
                 foreach (var skill in _skills.Values)
                 {
-                    _settings.Combat.Skills.Content.Add(skill);
+                    ExilePrecision.Instance.Settings.Combat.Skills.Content.Add(skill);
                 }
             }
             catch (Exception ex)

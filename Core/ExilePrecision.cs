@@ -13,12 +13,15 @@ namespace ExilePrecision
 {
     public class ExilePrecision : BaseSettingsPlugin<ExilePrecisionSettings>
     {
+        public static ExilePrecision Instance;
+
         private IRoutine _activeRoutine;
         private bool _isToggled;
 
         public ExilePrecision()
         {
             Name = "Exile Precision";
+            Instance = this;
         }
 
         public override bool Initialise()
@@ -35,7 +38,7 @@ namespace ExilePrecision
                     _isToggled = false;
                 };
 
-                var routineSelector = new CombatRoutineSelector(GameController, Settings);
+                var routineSelector = new CombatRoutineSelector(GameController);
 
                 var availableRoutines = routineSelector.GetAvailableRoutines();
                 Settings.Combat.AvailableStrategies.SetListValues(availableRoutines);
@@ -89,12 +92,6 @@ namespace ExilePrecision
         public override void AreaChange(AreaInstance area)
         {
             _isToggled = false;
-            if (_activeRoutine != null)
-            {
-                DebugWindow.LogMsg($"[Core] AreaChange() -> Calling OnAreaChange");
-                _activeRoutine.OnAreaChange(area);
-            }
-
             EventBus.Instance.Publish(new AreaChangeEvent { NewArea = area });
         }
 
@@ -130,17 +127,7 @@ namespace ExilePrecision
 
                 if (isActive && _activeRoutine != null)
                 {
-                    _activeRoutine.Execute();
-                }
-
-                // TODO: Implement EventBus for LightningArrowRoutine
-                if (Settings.Combat.EnableCombatMode)
-                {
-                    EventBus.Instance.Publish(new CombatStateChangedEvent
-                    {
-                        IsInCombat = true,
-                        CurrentTarget = null  // Let routines handle their own targeting
-                    });
+                    EventBus.Instance.Publish(new TickEvent(true));
                 }
             }
             catch (Exception ex)
@@ -153,17 +140,7 @@ namespace ExilePrecision
         {
             if (!Settings.Render.EnableRendering) return;
 
-            try
-            {
-                if (_activeRoutine != null)
-                {
-                    _activeRoutine.Render(Graphics);
-                }
-            }
-            catch (Exception ex)
-            {
-                DebugWindow.LogError($"[{Name}] Error in Render: {ex.Message}");
-            }
+            EventBus.Instance.Publish(new RenderEvent(Graphics));
         }
 
         private bool ShouldProcess()

@@ -19,8 +19,8 @@ namespace ExilePrecision.Core.Combat
         private const float ATTACK_MOVE_DELAY = 0.1f;
         private const float MOVE_DURATION = 0.05f;
 
-        protected OrbWalkingRoutineBase(string name, GameController gameController, ExilePrecisionSettings settings)
-            : base(name, gameController, settings)
+        protected OrbWalkingRoutineBase(string name, GameController gameController)
+            : base(name, gameController)
         {
             ResetState();
         }

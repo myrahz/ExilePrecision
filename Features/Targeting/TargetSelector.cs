@@ -20,7 +20,6 @@ namespace ExilePrecision.Features.Targeting
         private readonly PriorityCalculator _priorityCalculator;
         private readonly DensityAnalyzer _densityAnalyzer;
         private readonly LineOfSight _lineOfSight;
-        private readonly ExilePrecisionSettings _settings;
 
         private Entity _currentTarget;
         private DateTime _lastSelectionTime;
@@ -35,40 +34,38 @@ namespace ExilePrecision.Features.Targeting
             GameController gameController,
             EntityScanner entityScanner,
             PriorityCalculator priorityCalculator,
-            ExilePrecisionSettings settings,
             LineOfSight lineOfSight)
         {
             _gameController = gameController;
             _entityScanner = entityScanner;
             _priorityCalculator = priorityCalculator;
             _densityAnalyzer = new DensityAnalyzer(gameController, lineOfSight);
-            _settings = settings;
             _lineOfSight = lineOfSight;
         }
 
         public void Configure()
         {
-            _targetSwitchCooldown = _settings.Targeting.TargetSwitchThreshold;
-            _minWeightDifferenceForSwitch = _settings.Targeting.TargetSwitchThreshold;
-            _maxTargetDistance = _settings.Targeting.MaxTargetRange;
+            _targetSwitchCooldown = ExilePrecision.Instance.Settings.Targeting.TargetSwitchThreshold;
+            _minWeightDifferenceForSwitch = ExilePrecision.Instance.Settings.Targeting.TargetSwitchThreshold;
+            _maxTargetDistance = ExilePrecision.Instance.Settings.Targeting.MaxTargetRange;
 
-            var densitySettings = _settings.Targeting.Density;
+            var densitySettings = ExilePrecision.Instance.Settings.Targeting.Density;
             _baseClusterBonus = densitySettings.BaseClusterBonus;
             _maxClusterBonus = densitySettings.MaxClusterBonus;
 
-            _entityScanner.SetScanRange(_settings.Targeting.ScanRadius);
+            _entityScanner.SetScanRange(ExilePrecision.Instance.Settings.Targeting.ScanRadius);
             _densityAnalyzer.Configure(
                 densitySettings.ClusterRadius,
                 densitySettings.MinClusterSize,
-                _settings.Targeting.LineOfSight.RequireLineOfSight
+                ExilePrecision.Instance.Settings.Targeting.LineOfSight.RequireLineOfSight
             );
 
-            var priorities = _settings.Targeting.Priorities;
+            var priorities = ExilePrecision.Instance.Settings.Targeting.Priorities;
             _priorityCalculator.Configure(
                 distanceWeight: priorities.DistanceWeight,
                 healthWeight: priorities.Health.HealthWeight,
                 rarityWeight: priorities.Rarity.ConsiderRarity ? 1.0f : 0f,
-                maxTargetDistance: _settings.Targeting.MaxTargetRange,
+                maxTargetDistance: ExilePrecision.Instance.Settings.Targeting.MaxTargetRange,
                 preferHigherHealth: priorities.Health.PreferHigherHealth
             );
         }
@@ -192,10 +189,10 @@ namespace ExilePrecision.Features.Targeting
 
             var finalWeight = baseWeight.Value;
 
-            if (_settings.Targeting.Density.EnableClustering)
+            if (ExilePrecision.Instance.Settings.Targeting.Density.EnableClustering)
             {
                 var density = _densityAnalyzer.GetDensityAtPosition(entity.GridPos);
-                var densitySettings = _settings.Targeting.Density;
+                var densitySettings = ExilePrecision.Instance.Settings.Targeting.Density;
 
                 if (density != null)
                 {
@@ -290,11 +287,6 @@ namespace ExilePrecision.Features.Targeting
         public Entity GetCurrentTarget()
         {
             return _currentTarget;
-        }
-
-        public void OnAreaChange()
-        {
-            _lineOfSight.UpdateAreaData();
         }
 
         public void Clear()

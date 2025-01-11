@@ -3,7 +3,7 @@ using ExileCore2.PoEMemory.MemoryObjects;
 
 namespace ExilePrecision.Core.Events.Events
 {
-    public class SkillEvent : EventArgs
+    public class SkillEvent
     {
         public ActorSkill Skill { get; }
         public SkillEventType EventType { get; }

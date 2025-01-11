@@ -7,13 +7,14 @@ using System;
 using ExilePrecision.Settings;
 using System.Numerics;
 using ExilePrecision.Features.Rendering;
+using ExilePrecision.Core.Events;
+using ExilePrecision.Core.Events.Events;
 
 namespace ExilePrecision.Core.Combat
 {
     public abstract class RoutineBase : IRoutine
     {
         protected readonly GameController GameController;
-        protected readonly ExilePrecisionSettings Settings;
         protected readonly SkillMonitor SkillMonitor;
         protected readonly SkillHandler SkillHandler;
         protected readonly KeyHandler KeyHandler;
@@ -28,17 +29,26 @@ namespace ExilePrecision.Core.Combat
         public bool CanExecute => ValidateExecutionState();
         public RoutineState State => StateCoordinator.CurrentState;
 
-        protected RoutineBase(string name, GameController gameController, ExilePrecisionSettings settings)
+        protected RoutineBase(string name, GameController gameController)
         {
             Name = name;
             GameController = gameController;
-            Settings = settings;
 
             SkillMonitor = new SkillMonitor();
-            SkillHandler = new SkillHandler(gameController, settings);
+            SkillHandler = new SkillHandler(gameController);
             KeyHandler = new KeyHandler();
             StateCoordinator = new StateCoordinator();
-            CombatRenderer = new CombatRenderer(gameController, settings);
+            CombatRenderer = new CombatRenderer(gameController);
+
+            SubscribeToEvents();
+        }
+
+        private void SubscribeToEvents()
+        {
+            var eventBus = EventBus.Instance;
+            eventBus.Subscribe<AreaChangeEvent>(HandleAreaChange);
+            eventBus.Subscribe<TickEvent>(HandleTick);
+            eventBus.Subscribe<TargetChangedEvent>(HandleTargetChanged);
         }
 
         public virtual bool Initialize()
@@ -62,30 +72,7 @@ namespace ExilePrecision.Core.Combat
             }
         }
 
-        public abstract void Execute();
-
-        public virtual void UpdateTarget(EntityInfo target)
-        {
-            if (IsDisposed) return;
-
-            try
-            {
-                var previousTarget = CurrentTarget;
-                CurrentTarget = target;
-
-                if (previousTarget?.Id != target?.Id)
-                {
-                    OnTargetChanged(previousTarget, target);
-                }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Error updating target: {ex.Message}");
-                Stop();
-            }
-        }
-
-        public virtual void OnAreaChange(AreaInstance area)
+        protected virtual void HandleAreaChange(AreaChangeEvent evt)
         {
             if (IsDisposed) return;
 
@@ -101,58 +88,60 @@ namespace ExilePrecision.Core.Combat
             }
         }
 
-        public virtual void Render(Graphics graphics)
+        protected virtual void HandleTick(TickEvent evt)
         {
             if (!CanExecute || IsDisposed) return;
 
             try
             {
-                CombatRenderer.Render(graphics, CurrentTarget, StateCoordinator.CurrentState);
-                RenderRoutineSpecific(graphics);
+                if (evt.IsActive)
+                {
+                    StateCoordinator.SetState(RoutineState.Active);
+                    OnTickActive();
+                }
+                else
+                {
+                    StateCoordinator.SetState(RoutineState.Idle);
+                    Stop();
+                }
             }
             catch (Exception ex)
             {
-                LogError($"Error in render: {ex.Message}");
+                LogError($"Error handling tick: {ex.Message}");
+                Stop();
+                StateCoordinator.SetError(ex);
             }
         }
 
-        protected virtual void RenderRoutineSpecific(Graphics graphics)
-        {
-            // Override in derived classes to render routine-specific content
-        }
+        protected virtual void OnTickActive() { }
 
-        public virtual void Stop()
+        protected virtual void HandleTargetChanged(TargetChangedEvent evt)
         {
             if (IsDisposed) return;
 
             try
             {
-                KeyHandler.ReleaseAll();
-                StateCoordinator.Reset();
-                CurrentTarget = null;
+                CurrentTarget = evt.NewTarget;
+                OnTargetChanged(evt.OldTarget, evt.NewTarget);
             }
             catch (Exception ex)
             {
-                LogError($"Error stopping routine: {ex.Message}");
+                LogError($"Error handling target change: {ex.Message}");
+                Stop();
             }
         }
 
-        protected virtual void OnTargetChanged(EntityInfo oldTarget, EntityInfo newTarget)
-        {
-            // Override in derived classes to handle target changes but will soon convert to EventBus
-        }
-
-        protected virtual void InitializeSkills()
-        {
-            // Override in derived classes to initialize routine-specific skills
-        }
+        protected virtual void OnCombatStart() { }
+        protected virtual void OnCombatEnd() { }
+        protected virtual void OnTargetChanged(EntityInfo oldTarget, EntityInfo newTarget) { }
+        protected virtual void InitializeSkills() { }
 
         protected bool IsCursorOnTarget(EntityInfo target)
         {
             var cursorPos = ExileCore2.Input.MousePosition;
             var targetPos = GameController.IngameState.Camera.WorldToScreen(target.Pos);
 
-            return Vector2.Distance(cursorPos, targetPos) <= Settings.Combat.CombatRange.Value;
+            return Vector2.Distance(cursorPos, targetPos) <= ExilePrecision.Instance.Settings.Combat.CombatRange.Value;
         }
 
         protected bool ValidateExecutionState()
@@ -184,6 +173,22 @@ namespace ExilePrecision.Core.Combat
             DebugWindow.LogError($"[{Name}] {message}");
         }
 
+        public virtual void Stop()
+        {
+            if (IsDisposed) return;
+
+            try
+            {
+                KeyHandler.ReleaseAll();
+                StateCoordinator.Reset();
+                CurrentTarget = null;
+            }
+            catch (Exception ex)
+            {
+                LogError($"Error stopping routine: {ex.Message}");
+            }
+        }
+
         protected virtual void Dispose(bool disposing)
         {
             if (!IsDisposed)
@@ -196,6 +201,11 @@ namespace ExilePrecision.Core.Combat
                         KeyHandler.Dispose();
                         SkillMonitor.Reset();
                         CombatRenderer.Clear();
+
+                        var eventBus = EventBus.Instance;
+                        eventBus.Unsubscribe<AreaChangeEvent>(HandleAreaChange);
+                        eventBus.Unsubscribe<TickEvent>(HandleTick);
+                        eventBus.Unsubscribe<TargetChangedEvent>(HandleTargetChanged);
                     }
                     catch (Exception ex)
                     {

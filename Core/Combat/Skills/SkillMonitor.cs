@@ -35,7 +35,7 @@ namespace ExilePrecision.Core.Combat.Skills
             if (!_skillUsage.TryGetValue(skill.Name, out var usage))
                 return true;
 
-            var cooldownEnd = usage.LastUseTime.AddMilliseconds(skill.TotalDelay + extraBuffer);
+            var cooldownEnd = usage.LastUseTime.AddMilliseconds(extraBuffer);
             return DateTime.Now >= cooldownEnd;
         }
 

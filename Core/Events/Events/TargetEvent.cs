@@ -1,10 +1,11 @@
 ﻿using System;
 using ExileCore2.PoEMemory.MemoryObjects;
 using System.Numerics;
+using ExilePrecision.Features.Targeting.EntityInformation;
 
 namespace ExilePrecision.Core.Events.Events
 {
-    public class TargetEvent : EventArgs
+    public class TargetEvent
     {
         public Entity Entity { get; }
         public TargetEventType EventType { get; }
@@ -129,6 +130,11 @@ namespace ExilePrecision.Core.Events.Events
         }
     }
 
+    public class TargetChangedEvent
+    {
+        public EntityInfo OldTarget { get; set; }
+        public EntityInfo NewTarget { get; set; }
+    }
     public enum TargetEventType
     {
         Acquired,

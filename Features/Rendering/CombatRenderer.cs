@@ -21,25 +21,22 @@ namespace ExilePrecision.Features.Rendering
     public class CombatRenderer : ICombatRenderer
     {
         private readonly GameController _gameController;
-        private readonly ExilePrecisionSettings _settings;
 
-        private Vector2? _lastMousePosition;
         private List<Vector2> _movementPath = new();
 
-        public CombatRenderer(GameController gameController, ExilePrecisionSettings settings)
+        public CombatRenderer(GameController gameController)
         {
             _gameController = gameController;
-            _settings = settings;
         }
 
         public void Render(Graphics graphics, EntityInfo currentTarget, RoutineState state)
         {
-            if (!_settings.Render.EnableRendering) return;
+            if (!ExilePrecision.Instance.Settings.Render.EnableRendering) return;
             if (_gameController?.Game?.IngameState?.IngameUi == null) return;
 
-            var renderSettings = _settings.Render;
+            var renderSettings = ExilePrecision.Instance.Settings.Render;
 
-            if (currentTarget != null)
+            if (currentTarget != null && currentTarget.IsValid && currentTarget.IsAlive)
             {
                 if (renderSettings.TargetVisuals.ShowTargetHighlight)
                 {
@@ -61,7 +58,7 @@ namespace ExilePrecision.Features.Rendering
 
         private void RenderTargetHighlight(Graphics graphics, EntityInfo target)
         {
-            var highlightSettings = _settings.Render.TargetVisuals;
+            var highlightSettings = ExilePrecision.Instance.Settings.Render.TargetVisuals;
             var bounds = _gameController.IngameState.Camera.WorldToScreen(target.Pos);
 
             if (bounds != Vector2.Zero)
@@ -88,7 +85,7 @@ namespace ExilePrecision.Features.Rendering
 
         private void RenderTargetHealth(Graphics graphics, EntityInfo target)
         {
-            var healthSettings = _settings.Render.TargetVisuals;
+            var healthSettings = ExilePrecision.Instance.Settings.Render.TargetVisuals;
             var position = _gameController.IngameState.Camera.WorldToScreen(target.Pos);
 
             if (position != Vector2.Zero)
@@ -109,7 +106,7 @@ namespace ExilePrecision.Features.Rendering
                 $"Cursor Pos: {ExileCore2.Input.MousePosition}"
             };
 
-            if (currentTarget != null)
+            if (currentTarget != null && currentTarget.IsValid && currentTarget.IsAlive)
             {
                 debugInfo.Add($"Target: {currentTarget.Path}");
                 debugInfo.Add($"Distance: {currentTarget.Entity.DistancePlayer:F1}");
@@ -133,7 +130,6 @@ namespace ExilePrecision.Features.Rendering
 
         public void Clear()
         {
-            _lastMousePosition = null;
             _movementPath.Clear();
         }
     }

@@ -7,9 +7,11 @@ using ExilePrecision.Settings;
 using ExilePrecision.Features.Targeting;
 using ExilePrecision.Features.Targeting.Priority;
 using ExilePrecision.Routines.LightningArrow.Strategy;
+using ExilePrecision.Utils;
+using ExilePrecision.Core.Events;
+using ExilePrecision.Core.Events.Events;
 using System;
 using System.Numerics;
-using ExilePrecision.Utils;
 
 namespace ExilePrecision.Routines.LightningArrow
 {
@@ -19,24 +21,26 @@ namespace ExilePrecision.Routines.LightningArrow
         private readonly SkillPriority _skillPriority;
         private readonly LineOfSight _lineOfSight;
 
-        public LightningArrowRoutine(GameController gameController, ExilePrecisionSettings settings)
-            : base("Lightning Arrow", gameController, settings)
+        public LightningArrowRoutine(GameController gameController)
+            : base("Lightning Arrow", gameController)
         {
             _lineOfSight = new LineOfSight(gameController);
 
-            var entityScanner = new EntityScanner(gameController);
+            var entityScanner = new EntityScanner(gameController, _lineOfSight);
             var priorityCalculator = new PriorityCalculator(gameController);
 
             _targetSelector = new TargetSelector(
                 gameController,
                 entityScanner,
                 priorityCalculator,
-                settings,
                 _lineOfSight
             );
 
             _targetSelector.Configure();
             _skillPriority = new SkillPriority(gameController);
+
+            var eventBus = EventBus.Instance;
+            eventBus.Subscribe<RenderEvent>(HandleRender);
         }
 
         protected override void InitializeSkills()
@@ -53,7 +57,14 @@ namespace ExilePrecision.Routines.LightningArrow
             }
         }
 
-        public override void Execute()
+        protected override void HandleAreaChange(AreaChangeEvent evt)
+        {
+            _targetSelector?.Clear();
+            StateCoordinator.Reset();
+            base.HandleAreaChange(evt);
+        }
+
+        protected override void OnTickActive()
         {
             if (!CanExecute)
             {
@@ -78,12 +89,22 @@ namespace ExilePrecision.Routines.LightningArrow
                     SkillHandler.ReleaseAllSkills();
                 }
 
-                UpdateTarget(new EntityInfo(target, GameController));
-                if (CurrentTarget == null)
+                var entityInfo = new EntityInfo(target, GameController);
+                var oldTarget = CurrentTarget;
+                CurrentTarget = entityInfo;
+
+                if (!ValidateTarget())
                 {
+                    CurrentTarget = null;
                     StateCoordinator.SetState(RoutineState.Idle);
                     return;
                 }
+
+                EventBus.Instance.Publish(new TargetChangedEvent
+                {
+                    OldTarget = oldTarget,
+                    NewTarget = CurrentTarget
+                });
 
                 StateCoordinator.SetState(RoutineState.Active);
 
@@ -115,20 +136,28 @@ namespace ExilePrecision.Routines.LightningArrow
             }
         }
 
+        private void HandleRender(RenderEvent evt)
+        {
+            if (!ExilePrecision.Instance.Settings.Render.EnableRendering) return;
+
+            try
+            {
+                CombatRenderer.Render(evt.Graphics, CurrentTarget, StateCoordinator.CurrentState);
+            }
+            catch (Exception ex)
+            {
+                LogError($"Error in render: {ex.Message}");
+            }
+        }
+
         protected override bool ValidateTarget()
         {
-            if (CurrentTarget == null) return false;
-            if (!CurrentTarget.IsValid) return false;
-            if (!CurrentTarget.IsAlive) return false;
-            if (CurrentTarget.IsHidden) return false;
+            if (!base.ValidateTarget()) return false;
             if (!CurrentTarget.IsHostile) return false;
-            if (CurrentTarget.Distance > Settings.Targeting.MaxTargetRange) return false;
+            if (CurrentTarget.Distance > ExilePrecision.Instance.Settings.Targeting.MaxTargetRange) return false;
 
             var entity = CurrentTarget.Entity;
-            if (entity == null || !entity.IsValid || !entity.IsAlive || entity.IsDead)
-                return false;
-
-            return true;
+            return entity != null && entity.IsValid && entity.IsAlive && !entity.IsDead;
         }
 
         public override void Stop()
@@ -139,25 +168,12 @@ namespace ExilePrecision.Routines.LightningArrow
             base.Stop();
         }
 
-        protected override void RenderRoutineSpecific(Graphics graphics)
-        {
-            if (Settings.Render.ShowTerrainDebug)
-                _lineOfSight.Render(graphics);
-        }
-
-        public override void OnAreaChange(AreaInstance area)
-        {
-            _targetSelector?.Clear();
-            StateCoordinator.Reset();
-
-            _targetSelector?.OnAreaChange();
-            base.OnAreaChange(area);
-        }
-
         protected override void Dispose(bool disposing)
         {
             if (disposing)
             {
+                var eventBus = EventBus.Instance;
+                eventBus.Unsubscribe<RenderEvent>(HandleRender);
                 _targetSelector?.Clear();
             }
             base.Dispose(disposing);

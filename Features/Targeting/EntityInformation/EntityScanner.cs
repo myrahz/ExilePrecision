@@ -26,16 +26,24 @@ namespace ExilePrecision.Features.Targeting.EntityInformation
         private float _maxScanRange;
         private DateTime _lastFullScan;
 
-        public EntityScanner(GameController gameController)
+        public EntityScanner(GameController gameController, LineOfSight lineOfSight)
         {
             _gameController = gameController;
-            _lineOfSight = new LineOfSight(gameController);
+            _lineOfSight = lineOfSight;
             _trackedEntities = new HashSet<Entity>();
             _entityDistances = new Dictionary<Entity, float>();
             _entityLineOfSight = new Dictionary<Entity, bool>();
             _lastSeenTimes = new Dictionary<Entity, DateTime>();
             _maxScanRange = 100f;
             _lastFullScan = DateTime.MinValue;
+
+            var eventBus = EventBus.Instance;
+            eventBus.Subscribe<AreaChangeEvent>(HandleAreaChange);
+        }
+
+        private void HandleAreaChange(AreaChangeEvent evt)
+        {
+            Clear();
         }
 
         public void SetScanRange(float range)
@@ -43,11 +51,6 @@ namespace ExilePrecision.Features.Targeting.EntityInformation
             _maxScanRange = range;
         }
 
-        public void OnAreaChange()
-        {
-            _lineOfSight.UpdateAreaData();
-            Clear();
-        }
 
         public void Scan()
         {
@@ -73,7 +76,7 @@ namespace ExilePrecision.Features.Targeting.EntityInformation
         private bool ShouldPerformFullScan(Vector2 currentPlayerPos, DateTime currentTime)
         {
             if (_lastFullScan == DateTime.MinValue) return true;
-            if ((currentTime - _lastFullScan).TotalMilliseconds > 1000) return true;
+            if ((currentTime - _lastFullScan).TotalMilliseconds > 100) return true;
             if (_lastPlayerPosition == Vector2.Zero) return true;
             return Vector2.Distance(_lastPlayerPosition, currentPlayerPos) > 10f;
         }

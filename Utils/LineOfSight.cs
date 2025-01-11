@@ -5,6 +5,8 @@ using System.Numerics;
 using ExileCore2;
 using ExileCore2.Shared.Enums;
 using ExileCore2.Shared.Helpers;
+using ExilePrecision.Core.Events;
+using ExilePrecision.Core.Events.Events;
 using Graphics = ExileCore2.Graphics;
 
 namespace ExilePrecision.Utils
@@ -24,9 +26,58 @@ namespace ExilePrecision.Utils
         public LineOfSight(GameController gameController)
         {
             _gameController = gameController;
+
+            var eventBus = EventBus.Instance;
+            eventBus.Subscribe<AreaChangeEvent>(HandleAreaChange);
+            eventBus.Subscribe<RenderEvent>(HandleRender);
         }
 
-        public void UpdateAreaData()
+        private void HandleRender(RenderEvent evt)
+        {
+            if (!ExilePrecision.Instance.Settings.Render.EnableRendering) return;
+            if (!ExilePrecision.Instance.Settings.Render.ShowTerrainDebug) return;
+
+            if (_terrainData == null)
+            {
+                return;
+            }
+
+            UpdateDebugGrid(_gameController.Player.GridPos);
+
+            foreach (var (pos, value) in _debugPoints)
+            {
+                var worldPos = new Vector3(pos.GridToWorld(), _lastObserverZ);
+                var screenPos = _gameController.IngameState.Camera.WorldToScreen(worldPos);
+
+                Color color;
+                if (_debugVisiblePoints.Contains(pos))
+                {
+                    color = Color.Yellow;
+                }
+                else
+                {
+                    color = value switch
+                    {
+                        0 => Color.FromArgb(128, Color.Green),    // Walkable
+                        1 => Color.FromArgb(128, Color.Blue),     // Low obstacle
+                        2 => Color.FromArgb(128, Color.Orange),   // Medium obstacle
+                        3 => Color.FromArgb(128, Color.Red),      // High obstacle
+                        4 => Color.FromArgb(128, Color.Purple),   // Blocking
+                        5 => Color.FromArgb(128, Color.Black),    // Special
+                        _ => Color.FromArgb(128, Color.Gray)      // Unknown
+                    };
+                }
+
+                evt.Graphics.DrawText(
+                    value.ToString(),
+                    screenPos,
+                    color,
+                    FontAlign.Center
+                );
+            }
+        }
+        
+        private void HandleAreaChange(AreaChangeEvent evt)
         {
             _areaDimensions = _gameController.IngameState.Data.AreaDimensions;
             var rawData = _gameController.IngameState.Data.RawTerrainTargetingData;
@@ -211,48 +262,6 @@ namespace ExilePrecision.Utils
             _debugPoints.Clear();
             _debugRays.Clear();
             _debugVisiblePoints.Clear();
-        }
-
-        public void Render(Graphics graphics)
-        {
-            if (_terrainData == null)
-            {
-                return;
-            }
-
-            UpdateDebugGrid(_gameController.Player.GridPos);
-
-            foreach (var (pos, value) in _debugPoints)
-            {
-                var worldPos = new Vector3(pos.GridToWorld(), _lastObserverZ);
-                var screenPos = _gameController.IngameState.Camera.WorldToScreen(worldPos);
-
-                Color color;
-                if (_debugVisiblePoints.Contains(pos))
-                {
-                    color = Color.Yellow;
-                }
-                else
-                {
-                    color = value switch
-                    {
-                        0 => Color.FromArgb(128, Color.Green),    // Walkable
-                        1 => Color.FromArgb(128, Color.Blue),     // Low obstacle
-                        2 => Color.FromArgb(128, Color.Orange),   // Medium obstacle
-                        3 => Color.FromArgb(128, Color.Red),      // High obstacle
-                        4 => Color.FromArgb(128, Color.Purple),   // Blocking
-                        5 => Color.FromArgb(128, Color.Black),    // Special
-                        _ => Color.FromArgb(128, Color.Gray)      // Unknown
-                    };
-                }
-
-                graphics.DrawText(
-                    value.ToString(),
-                    screenPos,
-                    color,
-                    FontAlign.Center
-                );
-            }
         }
     }
 }

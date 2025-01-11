@@ -124,12 +124,6 @@ namespace ExilePrecision.Core.Events
         }
     }
 
-    public class TargetChangedEvent
-    {
-        public EntityInfo OldTarget { get; set; }
-        public EntityInfo NewTarget { get; set; }
-    }
-
     public class AreaChangeEvent
     {
         public AreaInstance NewArea { get; set; }

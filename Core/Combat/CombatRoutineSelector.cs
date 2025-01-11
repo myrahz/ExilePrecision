@@ -11,13 +11,11 @@ namespace ExilePrecision.Core.Combat
     public class CombatRoutineSelector
     {
         private readonly GameController _gameController;
-        private readonly ExilePrecisionSettings _settings;
         private readonly Dictionary<string, Type> _routineTypes;
 
-        public CombatRoutineSelector(GameController gameController, ExilePrecisionSettings settings)
+        public CombatRoutineSelector(GameController gameController)
         {
             _gameController = gameController;
-            _settings = settings;
             _routineTypes = DiscoverRoutines();
         }
 
@@ -51,7 +49,7 @@ namespace ExilePrecision.Core.Combat
         {
             try
             {
-                var routineName = _settings.Combat.AvailableStrategies.Value;
+                var routineName = ExilePrecision.Instance.Settings.Combat.AvailableStrategies.Value;
                 if (string.IsNullOrEmpty(routineName))
                 {
                     DebugWindow.LogError("[CombatRoutineSelector] No routine selected");
@@ -66,7 +64,7 @@ namespace ExilePrecision.Core.Combat
 
                 var instance = (RoutineBase)Activator.CreateInstance(
                     routineType,
-                    new object[] { _gameController, _settings }
+                    new object[] { _gameController }
                 );
 
                 return instance;
@@ -74,7 +72,7 @@ namespace ExilePrecision.Core.Combat
             catch (MissingMethodException ex)
             {
                 DebugWindow.LogError($"[CombatRoutineSelector] Missing constructor for routine: {ex.Message}");
-                DebugWindow.LogError($"[CombatRoutineSelector] Make sure the routine has a constructor that takes (GameController, ExilePrecisionSettings)");
+                DebugWindow.LogError($"[CombatRoutineSelector] Make sure the routine has a constructor that takes (GameController)");
                 return null;
             }
             catch (Exception ex)
