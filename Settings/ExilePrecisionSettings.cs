@@ -31,7 +31,6 @@ public class RenderSettings
     public ToggleNode ShowTerrainDebug { get; set; } = new(false);
 
     public TargetVisualsSettings TargetVisuals { get; set; } = new();
-    public MovementVisualsSettings MovementVisuals { get; set; } = new();
     public UISettings Interface { get; set; } = new();
     public CursorSettings Cursor { get; set; } = new();
 
@@ -43,16 +42,6 @@ public class RenderSettings
         public RangeNode<float> HighlightThickness { get; set; } = new(2f, 1f, 5f);
         public ToggleNode ShowTargetHealth { get; set; } = new(true);
         public ColorNode HealthTextColor { get; set; } = new(Color.FromArgb(255, 255, 255, 255));
-    }
-
-    [Submenu(CollapsedByDefault = false)]
-    public class MovementVisualsSettings
-    {
-        public ToggleNode ShowMovementPath { get; set; } = new(true);
-        public ColorNode PathColor { get; set; } = new(Color.FromArgb(128, 0, 255, 0));
-        public RangeNode<float> PathThickness { get; set; } = new(2f, 1f, 5f);
-        public ToggleNode ShowDestinationMarker { get; set; } = new(true);
-        public ColorNode DestinationMarkerColor { get; set; } = new(Color.FromArgb(180, 0, 255, 0));
     }
 
     [Submenu(CollapsedByDefault = true)]

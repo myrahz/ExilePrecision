@@ -39,11 +39,6 @@ namespace ExilePrecision.Features.Rendering
 
             var renderSettings = _settings.Render;
 
-            if (renderSettings.MovementVisuals.ShowDestinationMarker && _lastMousePosition.HasValue)
-            {
-                RenderDestinationMarker(graphics, _lastMousePosition.Value);
-            }
-
             if (currentTarget != null)
             {
                 if (renderSettings.TargetVisuals.ShowTargetHighlight)
@@ -62,16 +57,6 @@ namespace ExilePrecision.Features.Rendering
                 RenderDebugInfo(graphics, currentTarget, state);
             }
 
-        }
-
-        private void RenderDestinationMarker(Graphics graphics, Vector2 position)
-        {
-            var markerSettings = _settings.Render.MovementVisuals;
-            var color = markerSettings.DestinationMarkerColor.Value;
-            var size = 10f;
-
-            graphics.DrawCircle(position, size, color, 2f);
-            graphics.DrawCircle(position, size * 0.5f, color, 1f);
         }
 
         private void RenderTargetHighlight(Graphics graphics, EntityInfo target)
