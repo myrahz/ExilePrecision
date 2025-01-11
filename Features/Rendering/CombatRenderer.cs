@@ -1,0 +1,155 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Numerics;
+using ExileCore2;
+using ExileCore2.PoEMemory.Elements;
+using ExileCore2.PoEMemory.MemoryObjects;
+using ExilePrecision.Features.Targeting.EntityInformation;
+using ExilePrecision.Settings;
+using ExilePrecision.Core.Combat.State;
+using Graphics = ExileCore2.Graphics;
+
+namespace ExilePrecision.Features.Rendering
+{
+    public interface ICombatRenderer
+    {
+        void Render(Graphics graphics, EntityInfo currentTarget, RoutineState state);
+        void Clear();
+    }
+
+    public class CombatRenderer : ICombatRenderer
+    {
+        private readonly GameController _gameController;
+        private readonly ExilePrecisionSettings _settings;
+
+        private Vector2? _lastMousePosition;
+        private List<Vector2> _movementPath = new();
+
+        public CombatRenderer(GameController gameController, ExilePrecisionSettings settings)
+        {
+            _gameController = gameController;
+            _settings = settings;
+        }
+
+        public void Render(Graphics graphics, EntityInfo currentTarget, RoutineState state)
+        {
+            if (!_settings.Render.EnableRendering) return;
+            if (_gameController?.Game?.IngameState?.IngameUi == null) return;
+
+            var renderSettings = _settings.Render;
+
+            if (renderSettings.MovementVisuals.ShowDestinationMarker && _lastMousePosition.HasValue)
+            {
+                RenderDestinationMarker(graphics, _lastMousePosition.Value);
+            }
+
+            if (currentTarget != null)
+            {
+                if (renderSettings.TargetVisuals.ShowTargetHighlight)
+                {
+                    RenderTargetHighlight(graphics, currentTarget);
+                }
+
+                if (renderSettings.TargetVisuals.ShowTargetHealth)
+                {
+                    RenderTargetHealth(graphics, currentTarget);
+                }
+            }
+
+            if (renderSettings.ShowDebugInfo)
+            {
+                RenderDebugInfo(graphics, currentTarget, state);
+            }
+
+        }
+
+        private void RenderDestinationMarker(Graphics graphics, Vector2 position)
+        {
+            var markerSettings = _settings.Render.MovementVisuals;
+            var color = markerSettings.DestinationMarkerColor.Value;
+            var size = 10f;
+
+            graphics.DrawCircle(position, size, color, 2f);
+            graphics.DrawCircle(position, size * 0.5f, color, 1f);
+        }
+
+        private void RenderTargetHighlight(Graphics graphics, EntityInfo target)
+        {
+            var highlightSettings = _settings.Render.TargetVisuals;
+            var bounds = _gameController.IngameState.Camera.WorldToScreen(target.Pos);
+
+            if (bounds != Vector2.Zero)
+            {
+                var color = highlightSettings.TargetHighlightColor.Value;
+                var thickness = highlightSettings.HighlightThickness.Value;
+                var size = 25f;
+
+                graphics.DrawCircle(bounds, size, color, thickness);
+
+                float crosshairSize = size * 0.7f;
+                graphics.DrawLine(
+                    new Vector2(bounds.X - crosshairSize, bounds.Y),
+                    new Vector2(bounds.X + crosshairSize, bounds.Y),
+                    thickness,
+                    color);
+                graphics.DrawLine(
+                    new Vector2(bounds.X, bounds.Y - crosshairSize),
+                    new Vector2(bounds.X, bounds.Y + crosshairSize),
+                    thickness,
+                    color);
+            }
+        }
+
+        private void RenderTargetHealth(Graphics graphics, EntityInfo target)
+        {
+            var healthSettings = _settings.Render.TargetVisuals;
+            var position = _gameController.IngameState.Camera.WorldToScreen(target.Pos);
+
+            if (position != Vector2.Zero)
+            {
+                var color = healthSettings.HealthTextColor.Value;
+                var text = $"{(target.HPPercentage * 100):F2}%";
+                var textPos = position + new Vector2(0, 30);
+
+                graphics.DrawText(text, textPos, color);
+            }
+        }
+
+        private void RenderDebugInfo(Graphics graphics, EntityInfo currentTarget, RoutineState state)
+        {
+            var debugInfo = new List<string>
+            {
+                $"State: {state}",
+                $"Cursor Pos: {ExileCore2.Input.MousePosition}"
+            };
+
+            if (currentTarget != null)
+            {
+                debugInfo.Add($"Target: {currentTarget.Path}");
+                debugInfo.Add($"Distance: {currentTarget.Entity.DistancePlayer:F1}");
+                debugInfo.Add($"Health: {(currentTarget.HPPercentage * 100):F2}%");
+                debugInfo.Add($"ES: {(currentTarget.ESPercentage * 100):F2}%");
+                debugInfo.Add($"Rarity: {currentTarget.Rarity}");
+            }
+
+            var startPos = new Vector2(10, 200);
+            var color = Color.White;
+            var lineHeight = 20f;
+
+            for (int i = 0; i < debugInfo.Count; i++)
+            {
+                graphics.DrawText(
+                    debugInfo[i],
+                    startPos + new Vector2(0, i * lineHeight),
+                    color);
+            }
+        }
+
+        public void Clear()
+        {
+            _lastMousePosition = null;
+            _movementPath.Clear();
+        }
+    }
+}
