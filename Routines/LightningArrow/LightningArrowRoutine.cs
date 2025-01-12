@@ -57,82 +57,35 @@ namespace ExilePrecision.Routines.LightningArrow
             }
         }
 
-        protected override void HandleAreaChange(AreaChangeEvent evt)
+        protected override EntityInfo GetTarget()
         {
-            _targetSelector?.Clear();
-            StateCoordinator.Reset();
-            base.HandleAreaChange(evt);
+            _targetSelector.Update();
+            var target = _targetSelector.GetCurrentTarget();
+            return target != null ? new EntityInfo(target, GameController) : null;
         }
 
-        protected override void OnTickActive()
+        protected override void ExecuteCombatTick()
         {
-            if (!CanExecute)
+            if (CurrentTarget == null) return;
+
+            var nextSkill = _skillPriority.GetNextSkill(
+                CurrentTarget,
+                SkillHandler.GetAllSkills(),
+                SkillMonitor);
+
+            if (nextSkill != null)
             {
-                Stop();
-                return;
-            }
-
-            try
-            {
-                _targetSelector.Update();
-                var target = _targetSelector.GetCurrentTarget();
-
-                if (target == null)
+                var screenPos = CurrentTarget.ScreenPos;
+                if (screenPos != Vector2.Zero)
                 {
-                    StateCoordinator.SetState(RoutineState.Idle);
-                    SkillHandler.ReleaseAllSkills();
-                    return;
-                }
+                    ExileCore2.Input.SetCursorPos(screenPos);
 
-                if (CurrentTarget != null && CurrentTarget.Entity.Address != target.Address)
-                {
-                    SkillHandler.ReleaseAllSkills();
-                }
-
-                var entityInfo = new EntityInfo(target, GameController);
-                var oldTarget = CurrentTarget;
-                CurrentTarget = entityInfo;
-
-                if (!ValidateTarget())
-                {
-                    CurrentTarget = null;
-                    StateCoordinator.SetState(RoutineState.Idle);
-                    return;
-                }
-
-                EventBus.Instance.Publish(new TargetChangedEvent
-                {
-                    OldTarget = oldTarget,
-                    NewTarget = CurrentTarget
-                });
-
-                StateCoordinator.SetState(RoutineState.Active);
-
-                var nextSkill = _skillPriority.GetNextSkill(
-                    CurrentTarget,
-                    SkillHandler.GetAllSkills(),
-                    SkillMonitor);
-
-                if (nextSkill != null)
-                {
-                    var screenPos = CurrentTarget.ScreenPos;
-                    if (screenPos != Vector2.Zero)
+                    if (IsCursorOnTarget(CurrentTarget))
                     {
-                        ExileCore2.Input.SetCursorPos(screenPos);
-
-                        if (IsCursorOnTarget(CurrentTarget))
-                        {
-                            SkillMonitor.TrackUse(nextSkill);
-                            SkillHandler.UseSkill(nextSkill.Name);
-                        }
+                        SkillMonitor.TrackUse(nextSkill);
+                        SkillHandler.UseSkill(nextSkill.Name);
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                LogError($"Error executing routine: {ex.Message}");
-                Stop();
-                StateCoordinator.SetError(ex);
             }
         }
 
@@ -150,22 +103,11 @@ namespace ExilePrecision.Routines.LightningArrow
             }
         }
 
-        protected override bool ValidateTarget()
+        protected override void HandleAreaChange(AreaChangeEvent evt)
         {
-            if (!base.ValidateTarget()) return false;
-            if (!CurrentTarget.IsHostile) return false;
-            if (CurrentTarget.Distance > ExilePrecision.Instance.Settings.Targeting.MaxTargetRange) return false;
-
-            var entity = CurrentTarget.Entity;
-            return entity != null && entity.IsValid && entity.IsAlive && !entity.IsDead;
-        }
-
-        public override void Stop()
-        {
-            StateCoordinator.SetState(RoutineState.Inactive);
-            SkillHandler.ReleaseAllSkills();
-
-            base.Stop();
+            _targetSelector?.Clear();
+            StateCoordinator.Reset();
+            base.HandleAreaChange(evt);
         }
 
         protected override void Dispose(bool disposing)

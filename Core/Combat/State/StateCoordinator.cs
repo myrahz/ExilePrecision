@@ -8,6 +8,9 @@ namespace ExilePrecision.Core.Combat.State
         private Exception _lastError;
         private DateTime _lastStateChange;
 
+        public delegate void StateChangedHandler(RoutineState oldState, RoutineState newState);
+        public event StateChangedHandler StateChanged;
+
         public RoutineState CurrentState => _currentState;
         public Exception LastError => _lastError;
         public DateTime LastStateChange => _lastStateChange;
@@ -28,6 +31,7 @@ namespace ExilePrecision.Core.Combat.State
             _lastStateChange = DateTime.Now;
 
             OnStateChanged(oldState, newState);
+            StateChanged?.Invoke(oldState, newState);
         }
 
         public void SetError(Exception error)
@@ -38,9 +42,13 @@ namespace ExilePrecision.Core.Combat.State
 
         public void Reset()
         {
+            var oldState = _currentState;
             _currentState = RoutineState.Inactive;
             _lastError = null;
             _lastStateChange = DateTime.Now;
+
+            OnStateChanged(oldState, _currentState);
+            StateChanged?.Invoke(oldState, _currentState);
         }
 
         public bool IsInState(params RoutineState[] states)
@@ -77,7 +85,7 @@ namespace ExilePrecision.Core.Combat.State
 
         protected virtual void OnStateChanged(RoutineState oldState, RoutineState newState)
         {
-            // Override in derived classes if state change notifications are needed
+            // Override in derived classes if additional state change handling is needed
         }
     }
 }

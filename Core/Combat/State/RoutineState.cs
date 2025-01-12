@@ -4,6 +4,7 @@
     {
         Inactive,
         Idle,
+        Orbwalking,
         Active,
         Paused,
         Error
