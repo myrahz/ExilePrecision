@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using ExileCore2;
 using ExileCore2.PoEMemory.Components;
@@ -23,6 +24,8 @@ namespace ExilePrecision.Features.Targeting.Priority
         private float _rarityWeight = 1.0f;
         private float _maxTargetDistance = 100f;
         private bool _preferHigherHealth;
+        private bool _essenceDrainAvailable = false;
+        private bool _contagionAvailable = false;
 
         private const int CACHE_CLEANUP_INTERVAL = 120;
         private int _frameCounter;
@@ -49,6 +52,20 @@ namespace ExilePrecision.Features.Targeting.Priority
             _preferHigherHealth = preferHigherHealth;
         }
 
+        // Call this from DjinnSummoner2.GetTarget() before _targetSelector.Update()
+        // so the weight calculation uses the correct targeting mode.
+        // Example: _priorityCalculator.SetEssenceDrainAvailable(
+        //              SkillHandler.GetAllSkills().Any(s => s.Name == "EssenceDrainPlayer"));
+        public void SetEssenceDrainAvailable(bool available)
+        {
+            _essenceDrainAvailable = available;
+        }
+
+        public void SetContagionAvailable(bool available)
+        {
+            _contagionAvailable = available;
+        }
+
         public void UpdatePriorities(IEnumerable<Entity> entities)
         {
             if (_gameController?.Player == null) return;
@@ -60,21 +77,27 @@ namespace ExilePrecision.Features.Targeting.Priority
             {
                 if (!IsEntityValid(entity)) continue;
 
-                var oldWeight = GetCurrentWeight(entity);
-                var newWeight = CalculateWeight(entity, playerPos);
+                var distance = Vector2.Distance(playerPos, entity.GridPos);
+                var newWeight = CalculateWeight(entity, playerPos, distance); // pass distance in
 
-                if (Math.Abs(oldWeight - newWeight) > 0.1f)
+                float oldWeight;
+                bool changed;
+
+                lock (_lock)
                 {
-                    lock (_lock)
-                    {
+                    _currentWeights.TryGetValue(entity, out oldWeight);
+                    changed = Math.Abs(oldWeight - newWeight) > 0.1f;
+                    if (changed)
                         _currentWeights[entity] = newWeight;
-                    }
+                }
 
+                if (changed)
+                {
                     EventBus.Instance.Publish(new TargetPriorityChangedEvent(
                         entity,
                         oldWeight,
                         newWeight,
-                        Vector2.Distance(playerPos, entity.GridPos)));
+                        distance)); // reuse, no second sqrt
                 }
             }
 
@@ -84,22 +107,48 @@ namespace ExilePrecision.Features.Targeting.Priority
                 _frameCounter = 0;
             }
         }
-
-        private float CalculateWeight(Entity entity, Vector2 playerPos)
+        private float CalculateWeight(Entity entity, Vector2 playerPos, float distance)
         {
-            var distance = Vector2.Distance(playerPos, entity.GridPos);
             if (distance > _maxTargetDistance) return 0f;
 
-            var weight = 0f;
-
             var distanceNormalized = 1f - (distance / _maxTargetDistance);
-            weight += distanceNormalized * distanceNormalized * _distanceWeight;
 
+            if (_essenceDrainAvailable)
+            {
+                bool hasED = HasEssenceDrainDebuff(entity);
+                bool hasContagion = HasContagionDebuff(entity);
+                bool hasBoth = hasED && hasContagion;
+                var rarity = GetMonsterRarity(entity);
+                bool isElite = rarity == MonsterRarity.Rare || rarity == MonsterRarity.Unique;
+
+                float baseDistanceScore = distanceNormalized * distanceNormalized * _distanceWeight;
+
+                // Has both — already handled, very low priority regardless of rarity
+                if (hasBoth)
+                    return baseDistanceScore * 0.1f;
+
+                // Near a monster with both debuffs — ED will chain to it, low priority
+                // Elites bypass this penalty because they're always worth targeting directly
+                if (!isElite && IsNearMonsterWithBothDebuffs(entity))
+                    return baseDistanceScore * 0.1f;
+
+                // Has exactly one debuff — highest urgency, apply the missing half
+                if (hasED || hasContagion)
+                    return baseDistanceScore + 5f;
+
+                // Has neither — high priority, start the Contagion → ED cycle
+                return baseDistanceScore + 3f;
+            }
+
+
+            var weight = 0f;
+            weight += distanceNormalized * distanceNormalized * _distanceWeight;
             weight += CalculateHealthPriority(entity, distanceNormalized);
             weight += CalculateRarityPriority(entity, distanceNormalized);
-
+            weight += CalculateContagionPriority(entity);
             return weight;
         }
+        
 
         private float CalculateHealthPriority(Entity entity, float distanceFactor)
         {
@@ -125,6 +174,125 @@ namespace ExilePrecision.Features.Targeting.Priority
             };
 
             return rarityMultiplier * _rarityWeight * distanceFactor;
+        }
+
+        // Contagion priority: reward dying monsters that have neighbours to spread to.
+        //   Normal  → always gets the bonus (dies fast, great spread vector)
+        //   Magic   → only below 40 % HP
+        //   Rare    → only below 20 % HP
+        //   Unique  → no bonus (lives too long to be a useful vector)
+        //   Isolated (no other monster within 30 units) → no bonus regardless
+        private const float CONTAGION_PRIORITY_BONUS = 5.0f;
+        private const float CONTAGION_FINISH_PRIORITY_BONUS = 10.0f;
+        private const float CONTAGION_SPREAD_RADIUS = 30f;
+        private float CalculateContagionPriority(Entity entity)
+        {
+            if (!_contagionAvailable) return 0f;
+
+            try
+            {
+                bool hasContagion = HasContagionDebuff(entity);
+                bool hasED = HasEssenceDrainDebuff(entity);
+
+                // IMPORTANT:
+                // If monster already has Contagion but not ED,
+                // we want to STICK to it and kill/apply ED ASAP.
+                if (hasContagion && !hasED)
+                    return CONTAGION_FINISH_PRIORITY_BONUS;
+
+                // If it already has both, no need to focus it.
+                if (hasContagion && hasED)
+                    return 0f;
+
+                // No point if isolated — contagion won't spread
+                bool hasNeighbour = _gameController.EntityListWrapper
+                    .ValidEntitiesByType[EntityType.Monster]
+                    .Any(x =>
+                        x != entity &&
+                        x.IsAlive &&
+                        x.IsTargetable &&
+                        Vector2.Distance(x.GridPos, entity.GridPos) <= CONTAGION_SPREAD_RADIUS);
+
+                if (!hasNeighbour)
+                    return 0f;
+
+                var rarity = entity.GetComponent<ObjectMagicProperties>()?.Rarity
+                             ?? MonsterRarity.White;
+
+                var life = entity.GetComponent<Life>();
+                float hp = life?.HPPercentage ?? 1f;
+
+                return rarity switch
+                {
+                    MonsterRarity.White => CONTAGION_PRIORITY_BONUS,
+                    MonsterRarity.Magic => hp <= 0.40f ? CONTAGION_PRIORITY_BONUS : 0f,
+                    MonsterRarity.Rare => hp <= 0.20f ? CONTAGION_PRIORITY_BONUS : 0f,
+                    _ => 0f,
+                };
+            }
+            catch
+            {
+                return 0f;
+            }
+        }
+
+        private bool HasEssenceDrainDebuff(Entity entity)
+        {
+            try
+            {
+                if (!entity.TryGetComponent<Buffs>(out var buffs) || buffs.BuffsList == null)
+                    return false;
+                return buffs.BuffsList.Any(b => b.Name == "siphon_damage");
+            }
+            catch { return false; }
+        }
+
+        private bool HasContagionDebuff(Entity entity)
+        {
+            try
+            {
+                if (!entity.TryGetComponent<Buffs>(out var buffs) || buffs.BuffsList == null)
+                    return false;
+                return buffs.BuffsList.Any(b => b.Name == "contagion");
+            }
+            catch { return false; }
+        }
+
+        // True if any monster within ED chain range already carries both debuffs.
+        // Those monsters will die soon and chain ED + spread Contagion to this entity,
+        // so there is no need to target it directly.
+        private const float ED_CHAIN_RADIUS = 35f;
+
+        private bool IsNearMonsterWithBothDebuffs(Entity entity)
+        {
+            try
+            {
+                return _gameController.EntityListWrapper
+                    .ValidEntitiesByType[EntityType.Monster]
+                    .Any(x =>
+                        x != entity &&
+                        x.IsAlive &&
+                        x.IsTargetable &&
+                        Vector2.Distance(x.GridPos, entity.GridPos) <= ED_CHAIN_RADIUS &&
+                        HasEssenceDrainDebuff(x) &&
+                        HasContagionDebuff(x));
+            }
+            catch { return false; }
+        }
+
+        private int CountNearbyEntities(Entity entity, float radius)
+        {
+            try
+            {
+                return _gameController.EntityListWrapper
+                    .ValidEntitiesByType[EntityType.Monster]
+                    .Count(x =>
+                        x != entity &&
+                        x.IsAlive &&
+                        x.IsTargetable &&
+                        Vector2.Distance(x.GridPos, entity.GridPos) <= radius);
+            }
+            catch { return 0; }
         }
 
         private Life GetLifeComponent(Entity entity)

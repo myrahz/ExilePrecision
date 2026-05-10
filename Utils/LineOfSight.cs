@@ -32,6 +32,50 @@ namespace ExilePrecision.Utils
             eventBus.Subscribe<RenderEvent>(HandleRender);
         }
 
+        //private void HandleRender(RenderEvent evt)
+        //{
+        //    if (!ExilePrecision.Instance.Settings.Render.EnableRendering) return;
+        //    if (!ExilePrecision.Instance.Settings.Render.ShowTerrainDebug) return;
+
+        //    if (_terrainData == null)
+        //    {
+        //        return;
+        //    }
+
+        //    UpdateDebugGrid(_gameController.Player.GridPos);
+
+        //    foreach (var (pos, value) in _debugPoints)
+        //    {
+        //        var worldPos = new Vector3(pos.GridToWorld(), _lastObserverZ);
+        //        var screenPos = _gameController.IngameState.Camera.WorldToScreen(worldPos);
+
+        //        Color color;
+        //        if (_debugVisiblePoints.Contains(pos))
+        //        {
+        //            color = Color.Yellow;
+        //        }
+        //        else
+        //        {
+        //            color = value switch
+        //            {
+        //                0 => Color.FromArgb(128, Color.Green),    // Walkable
+        //                1 => Color.FromArgb(128, Color.Blue),     // Low obstacle
+        //                2 => Color.FromArgb(128, Color.Orange),   // Medium obstacle
+        //                3 => Color.FromArgb(128, Color.Red),      // High obstacle
+        //                4 => Color.FromArgb(128, Color.Purple),   // Blocking
+        //                5 => Color.FromArgb(128, Color.Black),    // Special
+        //                _ => Color.FromArgb(128, Color.Gray)      // Unknown
+        //            };
+        //        }
+
+        //        evt.Graphics.DrawText(
+        //            value.ToString(),
+        //            screenPos,
+        //            color,
+        //            FontAlign.Center
+        //        );
+        //    }
+        //}
         private void HandleRender(RenderEvent evt)
         {
             if (!ExilePrecision.Instance.Settings.Render.EnableRendering) return;
@@ -76,7 +120,6 @@ namespace ExilePrecision.Utils
                 );
             }
         }
-        
         private void HandleAreaChange(AreaChangeEvent evt)
         {
             _areaDimensions = _gameController.IngameState.Data.AreaDimensions;
@@ -109,20 +152,24 @@ namespace ExilePrecision.Utils
 
             _lastObserverZ = _gameController.IngameState.Data.GetTerrainHeightAt(center);
         }
-
         public bool HasLineOfSight(Vector2 start, Vector2 end)
         {
             if (_terrainData == null) return false;
-
-            // Update debug visualization
-            _debugVisiblePoints.Clear();
-            UpdateDebugGrid(start);
-
-            var isVisible = HasLineOfSightInternal(start, end);
-            _debugRays.Add((start, end, isVisible));
-
-            return isVisible;
+            return HasLineOfSightInternal(start, end);
         }
+        //public bool HasLineOfSight(Vector2 start, Vector2 end)
+        //{
+        //    if (_terrainData == null) return false;
+
+        //    // Update debug visualization
+        //    _debugVisiblePoints.Clear();
+        //    UpdateDebugGrid(start);
+
+        //    var isVisible = HasLineOfSightInternal(start, end);
+        //    _debugRays.Add((start, end, isVisible));
+
+        //    return isVisible;
+        //}
 
         private bool HasLineOfSightInternal(Vector2 start, Vector2 end)
         {

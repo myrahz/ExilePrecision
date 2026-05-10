@@ -20,7 +20,7 @@ namespace ExilePrecision.Core.Combat
         protected readonly KeyHandler KeyHandler;
         protected readonly StateCoordinator StateCoordinator;
         protected readonly ICombatRenderer CombatRenderer;
-
+        private bool _skillsPanelWasOpen = false;
         protected EntityInfo CurrentTarget;
         protected bool IsInitialized;
         protected bool IsDisposed;
@@ -91,7 +91,7 @@ namespace ExilePrecision.Core.Combat
         protected virtual void HandleTick(TickEvent evt)
         {
             if (!CanExecute || IsDisposed) return;
-
+            CheckSkillsPanelRefresh();
             try
             {
                 if (evt.IsActive)
@@ -112,7 +112,25 @@ namespace ExilePrecision.Core.Combat
                 StateCoordinator.SetError(ex);
             }
         }
+        private void CheckSkillsPanelRefresh()
+        {
+            var ingameUi = GameController?.IngameState?.IngameUi;
+            if (ingameUi == null) return;
 
+            // OpenLeftPanel is the character/skills panel (C key in PoE)
+            // Swap to OpenRightPanel if your skills panel opens on the right
+            var isOpen = ingameUi.SkillsWindow.IsVisible;
+
+            if (isOpen && !_skillsPanelWasOpen)
+            {
+                DebugWindow.LogMsg($"[{Name}] Skills panel opened — refreshing skills");
+                Stop();
+                InitializeSkills();
+                StateCoordinator.Reset();
+            }
+
+            _skillsPanelWasOpen = isOpen;
+        }
         protected virtual void OnTickActive() { }
 
         protected virtual void HandleTargetChanged(TargetChangedEvent evt)

@@ -34,7 +34,7 @@ namespace ExilePrecision.Core.Combat.Skills
                 var skillBar = _gameController.IngameState.IngameUi.SkillBar;
                 var shortcuts = _gameController.IngameState.ShortcutSettings.Shortcuts;
 
-                for (var i = 0; i < Math.Min(8, skillBar.Skills.Count); i++)
+                for (var i = 0; i < Math.Min(13, skillBar.Skills.Count); i++)
                 {
                     try
                     {

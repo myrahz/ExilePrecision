@@ -8,7 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace ExilePrecision.Routines.LightningArrow.Strategy
+namespace ExilePrecision.Routines.StormcallerIncendiary.Strategy
 {
     public class SkillPriority
     {
@@ -18,6 +18,10 @@ namespace ExilePrecision.Routines.LightningArrow.Strategy
             "IceTippedArrowsPlayer",
             "WarBannerPlayer",
             "FrostBombPlayer",
+            "IncendiaryShotAmmoPlayer",
+            "BarragePlayer",
+            "IncendiaryShotPlayer",
+            "StormcallerArrowPlayer",
             "MeleeCrossbowPlayer",
             "LightningArrowPlayer",
             "LightningRodPlayer",
@@ -59,27 +63,51 @@ namespace ExilePrecision.Routines.LightningArrow.Strategy
             SkillMonitor skillMonitor)
         {
 
-            if (_gameController.Player.GetComponent<Player>().Level < 8)
+
+
+            if (_gameController.Player.GetComponent<Player>().Level < 7)
             {
+                if(CountNearbyMonsters(target.Entity) > 1)
+                {
+                    var lightningArrow = FindSkill(availableSkills, "LightningArrowPlayer");
+                    if (lightningArrow != null && skillMonitor.CanUseSkill(lightningArrow))
+                        return lightningArrow;
+
+                }
+
+                var stormCallerArrow = FindSkill(availableSkills, "StormcallerArrowPlayer");
+                if (stormCallerArrow != null && skillMonitor.CanUseSkill(stormCallerArrow))
+                    return stormCallerArrow;
+
+                var XbowShot = FindSkill(availableSkills, "MeleeCrossbowPlayer");
+                if (XbowShot != null && skillMonitor.CanUseSkill(XbowShot))
+                    return XbowShot;
 
 
-                var XBowShot = FindSkill(availableSkills, "MeleeCrossbowPlayer");
-                if (XBowShot != null && skillMonitor.CanUseSkill(XBowShot))
-                    return XBowShot;
-
-
-                var BowShot2 = FindSkill(availableSkills, "MeleeBowPlayer");
-                if (BowShot2 != null && skillMonitor.CanUseSkill(BowShot2))
-                    return BowShot2;
+                var bowShot = FindSkill(availableSkills, "MeleeBowPlayer");
+                if (bowShot != null && skillMonitor.CanUseSkill(bowShot))
+                    return bowShot;
 
             }
+            //var frostbomb = FindSkill(availableSkills, "FrostBombPlayer");
+            //if (frostbomb != null && skillMonitor.CanUseSkill(frostbomb))
+            //            return frostbomb;
+  
+
             var orbOfStorms = FindSkill(availableSkills, "OrbOfStormsPlayer");
+
+            // mark if I have it
             if (!HasVoltaicMark(target.Entity))
             {
                 var voltaic = FindSkill(availableSkills, "VoltaicMarkPlayer");
                 if (voltaic != null && skillMonitor.CanUseSkill(voltaic))
                     return voltaic;
             }
+
+
+            // freezing salvo if is ready
+
+
 
             if (target.Rarity == MonsterRarity.Unique || target.Rarity == MonsterRarity.Rare)
             {
@@ -93,9 +121,47 @@ namespace ExilePrecision.Routines.LightningArrow.Strategy
 					
 				}
 
-                
 
-           
+
+                // incendiary shot if I can
+
+
+
+                var IncendiaryShotAmmo = FindSkill(availableSkills, "IncendiaryShotAmmoPlayer");
+
+                if (IncendiaryShotAmmo != null)
+                {
+                    if (IncendiaryShotAmmo.Skill.SkillUseStage == 3 && skillMonitor.CanUseSkill(IncendiaryShotAmmo))
+                        return IncendiaryShotAmmo;
+                }
+
+
+                var IncendiaryShot = FindSkill(availableSkills, "IncendiaryShotPlayer");
+                if (IncendiaryShot != null && skillMonitor.CanUseSkill(IncendiaryShot))
+                    return IncendiaryShot;
+
+
+                // barrage if I can
+                var barrage = FindSkill(availableSkills, "BarragePlayer");
+                if (barrage != null && skillMonitor.CanUseSkill(barrage) && !hasBarrageBuff())
+                    return barrage;
+                // stormcaller arrow if I can
+
+                var stormCallerArrow = FindSkill(availableSkills, "StormcallerArrowPlayer");
+                if (stormCallerArrow != null && skillMonitor.CanUseSkill(stormCallerArrow))
+                    return stormCallerArrow;
+
+                // ORB OF STORMS LR LA TECH
+
+
+                //var stormCallerArrowAux = FindSkill(availableSkills, "StormcallerArrowPlayer");
+                //if (HasNearbyStormCloud(target.Entity) && stormCallerArrowAux == null && !skillMonitor.CanUseSkill(stormCallerArrowAux))
+                //if (HasNearbyStormCloud(target.Entity))
+                //{
+                //    var lightningRod = FindSkill(availableSkills, "LightningRodPlayer");
+                //    if (lightningRod != null && skillMonitor.CanUseSkill(lightningRod))
+                //        return lightningRod;
+                //}
 				if (orbOfStorms != null)
                 {
 					if (target.Distance <= EFFECTIVE_ORB_RANGE )
@@ -112,69 +178,58 @@ namespace ExilePrecision.Routines.LightningArrow.Strategy
 							return lightningRod;
 					}
 
-                    if (_gameController.Player.GetComponent<Player>().Level < 3)
-                    {
-                        var bowShot = FindSkill(availableSkills, "MeleeBowPlayer");
-                        if (bowShot != null && skillMonitor.CanUseSkill(bowShot))
-                            return bowShot;
 
-                    }
-
-
-
-                    var frostbomb = FindSkill(availableSkills, "FrostBombPlayer");
-                    if (frostbomb != null && skillMonitor.CanUseSkill(frostbomb))
-                        return frostbomb;
+                    
                     
 
-                    var barrage = FindSkill(availableSkills, "BarragePlayer");
-                    if (barrage != null && skillMonitor.CanUseSkill(barrage) && !hasBarrageBuff())
-                        return barrage;
 
-
-                    var itarrows = FindSkill(availableSkills, "IceTippedArrowsPlayer");
-                    if (itarrows != null && skillMonitor.CanUseSkill(itarrows) && !hasITArrowsBuff())
-                        return itarrows;
 
                     var lightningArrow = FindSkill(availableSkills, "LightningArrowPlayer");
 					if (lightningArrow != null && skillMonitor.CanUseSkill(lightningArrow))
 						return lightningArrow;
-					
-				}
-            }
-            else 
-            {
-                if (ShouldUseLightningRod(target.Entity))
-                {
-                    var lightningRod = FindSkill(availableSkills, "LightningRodPlayer");
-                    if (lightningRod != null && skillMonitor.CanUseSkill(lightningRod))
-                        return lightningRod;
+
+
+
+
                 }
-
-                var barrage = FindSkill(availableSkills, "BarragePlayer");
-                if (barrage != null && skillMonitor.CanUseSkill(barrage) && !hasBarrageBuff())
-                    return barrage;
-
-
-                var xBowShot2 = FindSkill(availableSkills, "MeleeCrossbowPlayer");
-                if (xBowShot2 != null && skillMonitor.CanUseSkill(xBowShot2))
-                    return xBowShot2;
-
-                var BowShot2 = FindSkill(availableSkills, "MeleeBowPlayer");
-                if (BowShot2 != null && skillMonitor.CanUseSkill(BowShot2))
-                    return BowShot2;
-
-
-                var lightningArrow = FindSkill(availableSkills, "LightningArrowPlayer");
-                if (lightningArrow != null && skillMonitor.CanUseSkill(lightningArrow))
-                    return lightningArrow;
             }
+            //else 
+            //{
+            //    if (ShouldUseLightningRod(target.Entity))
+            //    {
+            //        var lightningRod = FindSkill(availableSkills, "LightningRodPlayer");
+            //        if (lightningRod != null && skillMonitor.CanUseSkill(lightningRod))
+            //            return lightningRod;
+            //    }
 
-            var BowShot = FindSkill(availableSkills, "MeleeBowPlayer");
-            if (BowShot != null && skillMonitor.CanUseSkill(BowShot))
-                return BowShot;
+            //    var barrage = FindSkill(availableSkills, "BarragePlayer");
+            //    if (barrage != null && skillMonitor.CanUseSkill(barrage) && !hasBarrageBuff())
+            //        return barrage;
+
+               
+
+            //    var lightningArrow = FindSkill(availableSkills, "LightningArrowPlayer");
+            //    if (lightningArrow != null && skillMonitor.CanUseSkill(lightningArrow))
+            //        return lightningArrow;
 
 
+            //    var bowShot2 = FindSkill(availableSkills, "MeleeBowPlayer");
+            //    if (bowShot2 != null && skillMonitor.CanUseSkill(bowShot2))
+            //        return bowShot2;
+
+            //    var XbowShot2 = FindSkill(availableSkills, "MeleeCrossbowPlayer");
+            //    if (XbowShot2 != null && skillMonitor.CanUseSkill(XbowShot2))
+            //        return XbowShot2;
+            //}
+
+
+            var bowShot2 = FindSkill(availableSkills, "MeleeBowPlayer");
+            if (bowShot2 != null && skillMonitor.CanUseSkill(bowShot2))
+                return bowShot2;
+
+            var XbowShot2 = FindSkill(availableSkills, "MeleeCrossbowPlayer");
+            if (XbowShot2 != null && skillMonitor.CanUseSkill(XbowShot2))
+                return XbowShot2;
             return null;
         }
 
@@ -191,6 +246,7 @@ namespace ExilePrecision.Routines.LightningArrow.Strategy
                     return contagion;
 
             }
+
             var freezingSalvo = FindSkill(availableSkills, "FreezingSalvoPlayer");
             if (freezingSalvo != null && CountNearbyMonsters(target.Entity) > 5)
             {
@@ -200,14 +256,49 @@ namespace ExilePrecision.Routines.LightningArrow.Strategy
                 }
             }
 
-            var barrage = FindSkill(availableSkills, "BarragePlayer");
-            if (barrage != null && skillMonitor.CanUseSkill(barrage) && !hasBarrageBuff())
-                return barrage;
+            if (CountNearbyMonsters(target.Entity) <1 && _gameController.Player.GetComponent<Player>().Level < 28 )
+            {
+                var IncendiaryShotAmmo = FindSkill(availableSkills, "IncendiaryShotAmmoPlayer");
+
+                if (IncendiaryShotAmmo != null)
+                {
+                    if (IncendiaryShotAmmo.Skill.SkillUseStage == 3 && skillMonitor.CanUseSkill(IncendiaryShotAmmo))
+                        return IncendiaryShotAmmo;
+                }
 
 
-            var itarrows = FindSkill(availableSkills, "IceTippedArrowsPlayer");
-            if (itarrows != null && skillMonitor.CanUseSkill(itarrows) && !hasITArrowsBuff())
-                return itarrows;
+                var IncendiaryShot = FindSkill(availableSkills, "IncendiaryShotPlayer");
+                if (IncendiaryShot != null && skillMonitor.CanUseSkill(IncendiaryShot))
+                    return IncendiaryShot;
+
+                if (_gameController.Player.GetComponent<Player>().Level < 7)
+                {
+                    var XbowShot2 = FindSkill(availableSkills, "MeleeCrossbowPlayer");
+                    if (XbowShot2 != null && skillMonitor.CanUseSkill(XbowShot2))
+                        return XbowShot2;
+
+
+                    var bowShot2 = FindSkill(availableSkills, "MeleeBowPlayer");
+                    if (bowShot2 != null && skillMonitor.CanUseSkill(bowShot2))
+                        return bowShot2;
+                }
+
+
+            }
+
+
+
+            //var barrage = FindSkill(availableSkills, "BarragePlayer");
+            //if (barrage != null && skillMonitor.CanUseSkill(barrage) && !hasBarrageBuff())
+            //    return barrage;
+
+            //var itarrows = FindSkill(availableSkills, "IceTippedArrowsPlayer");
+            //if (itarrows != null && skillMonitor.CanUseSkill(itarrows) && !hasITArrowsBuff())
+            //    return itarrows;
+
+            var stormCallerArrow = FindSkill(availableSkills, "StormcallerArrowPlayer");
+            if (stormCallerArrow != null && skillMonitor.CanUseSkill(stormCallerArrow))
+                return stormCallerArrow;
 
             if (ShouldUseLightningRod(target.Entity))
             {
@@ -219,8 +310,6 @@ namespace ExilePrecision.Routines.LightningArrow.Strategy
             var lightningArrow = FindSkill(availableSkills, "LightningArrowPlayer");
             if (lightningArrow != null && skillMonitor.CanUseSkill(lightningArrow))
                 return lightningArrow;
-
-
 
             return null;
         }
@@ -258,22 +347,6 @@ namespace ExilePrecision.Routines.LightningArrow.Strategy
                 return false;
             }
         }
-        private bool hasITArrowsBuff()
-        {
-            var player = _gameController.Player;
-            try
-            {
-                if (!player.TryGetComponent<Buffs>(out var buffs))
-                    return false;
-
-                return buffs.BuffsList?.Any(buff => buff.Name == "shearing_bolts") ?? false;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-
-        }
         private bool hasBarrageBuff()
         {
             var player = _gameController.Player;
@@ -283,6 +356,22 @@ namespace ExilePrecision.Routines.LightningArrow.Strategy
                     return false;
 
                 return buffs.BuffsList?.Any(buff => buff.Name == "empower_barrage_visual") ?? false;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+
+        }        
+        private bool hasITArrowsBuff()
+        {
+            var player = _gameController.Player;
+            try
+            {
+                if (!player.TryGetComponent<Buffs>(out var buffs))
+                    return false;
+
+                return buffs.BuffsList?.Any(buff => buff.Name == "shearing_bolts") ?? false;
             }
             catch (Exception)
             {
@@ -405,7 +494,7 @@ namespace ExilePrecision.Routines.LightningArrow.Strategy
                 return _gameController.Entities
                     .Where(x => x?.Type.Equals(EntityType.Monster) ?? false)
                     .Where(x => x?.IsAlive ?? false)
-                    .Where(x => x.Distance(target) <= NEARBY_MONSTER_RADIUS)
+                    .Where(x => x.Distance(target) <= NEARBY_MONSTER_RADIUS*2)
                     .Any(monster =>
                     {
                         if (!monster.TryGetComponent<Buffs>(out var buffs))
